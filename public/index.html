@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Swiss WCA Personal Records</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Latest Swiss WCA Personal Records</h1>
+
+    <div id="records"></div>
+
+    <script>
+        async function loadRecords() {
+            const container = document.getElementById("records");
+            container.innerHTML = "<div class='loading'>Loading Swiss records… (may take 10–20 seconds)</div>";
+
+            const res = await fetch("/swiss-records");
+            const data = await res.json();
+
+            container.innerHTML = "";
+
+            Object.keys(data)
+                .sort((a, b) => new Date(b) - new Date(a))
+                .forEach(date => {
+                    const block = document.createElement("div");
+                    block.className = "date-block";
+
+                    const header = document.createElement("h2");
+                    header.textContent = date;
+                    block.appendChild(header);
+
+                    data[date].forEach(entry => {
+                        const div = document.createElement("div");
+                        div.className = "record-entry";
+
+                        div.innerHTML = `
+                            <div class="name">${entry.name} (${entry.wca_id})</div>
+                            <div class="event">${entry.event}</div>
+                            <div class="pr-values">
+                                ${entry.single ? `Single: ${entry.single}` : ""}
+                                ${entry.average ? ` | Avg: ${entry.average}` : ""}
+                            </div>
+                        `;
+
+                        block.appendChild(div);
+                    });
+
+                    container.appendChild(block);
+                });
+        }
+
+        loadRecords();
+    </script>
+</body>
+</html>
