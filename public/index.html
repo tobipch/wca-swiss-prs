@@ -1,53 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Swiss WCA Personal Records</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Latest Swiss WCA Personal Records</h1>
+    <header class="hero">
+        <div class="hero__content">
+            <p class="eyebrow">WCA REST API</p>
+            <h1>Swiss Personal Records in the Last Month</h1>
+            <p class="subtitle">Powered by <a href="https://wca-rest-api.robiningelbrecht.be" target="_blank" rel="noopener">wca-rest-api.robiningelbrecht.be</a></p>
+            <p id="date-window" class="date-window"></p>
+        </div>
+    </header>
 
-    <div id="records"></div>
+    <main class="page">
+        <section class="panel">
+            <div id="status" class="status">Loading Swiss personal records…</div>
+            <div id="records" class="records"></div>
+        </section>
+    </main>
 
     <script>
-        async function loadRecords() {
+        function createRecordRow(record) {
+            const row = document.createElement("div");
+            row.className = "record-row";
+
+            row.innerHTML = `
+                <div class="record-row__event">
+                    <div class="pill">${record.eventId}</div>
+                    <div class="record-row__event-name">${record.eventName}</div>
+                </div>
+                <div class="record-row__competitor">
+                    <div class="name">${record.name}</div>
+                    <div class="muted">${record.wcaId}</div>
+                </div>
+                <div class="record-row__times">
+                    ${record.single ? `<div><span class="muted">Single</span><div class="time">${record.single}</div></div>` : ""}
+                    ${record.average ? `<div><span class="muted">Average</span><div class="time">${record.average}</div></div>` : ""}
+                </div>
+            `;
+
+            return row;
+        }
+
+        function renderRecords(payload) {
+            const status = document.getElementById("status");
             const container = document.getElementById("records");
-            container.innerHTML = "<div class='loading'>Loading Swiss records… (may take 10–20 seconds)</div>";
-
-            const res = await fetch("/swiss-records");
-            const data = await res.json();
-
+            status.textContent = "";
             container.innerHTML = "";
 
-            Object.keys(data)
-                .sort((a, b) => new Date(b) - new Date(a))
-                .forEach(date => {
-                    const block = document.createElement("div");
-                    block.className = "date-block";
+            if (!payload.dates || payload.dates.length === 0) {
+                status.textContent = "No personal records found for Swiss competitors in the past month.";
+                return;
+            }
 
-                    const header = document.createElement("h2");
-                    header.textContent = date;
-                    block.appendChild(header);
+            payload.dates.forEach(({ date, records }) => {
+                const group = document.createElement("div");
+                group.className = "date-group";
 
-                    data[date].forEach(entry => {
-                        const div = document.createElement("div");
-                        div.className = "record-entry";
+                const header = document.createElement("div");
+                header.className = "date-group__header";
+                header.innerHTML = `<div class="date">${date}</div><div class="count">${records.length} PR${records.length === 1 ? "" : "s"}</div>`;
+                group.appendChild(header);
 
-                        div.innerHTML = `
-                            <div class="name">${entry.name} (${entry.wca_id})</div>
-                            <div class="event">${entry.event}</div>
-                            <div class="pr-values">
-                                ${entry.single ? `Single: ${entry.single}` : ""}
-                                ${entry.average ? ` | Avg: ${entry.average}` : ""}
-                            </div>
-                        `;
+                records.forEach((record) => group.appendChild(createRecordRow(record)));
+                container.appendChild(group);
+            });
+        }
 
-                        block.appendChild(div);
-                    });
+        function renderError(message) {
+            const status = document.getElementById("status");
+            status.textContent = message;
+            status.classList.add("error");
+        }
 
-                    container.appendChild(block);
-                });
+        async function loadRecords() {
+            try {
+                const response = await fetch("/api/swiss-prs");
+                const payload = await response.json();
+                if (!response.ok) {
+                    const detail = payload?.details ? ` (${payload.details})` : "";
+                    throw new Error(`Unexpected response from server${detail}`);
+                }
+
+                const dateWindow = document.getElementById("date-window");
+                dateWindow.textContent = `Window: ${payload.dateRange.start} → ${payload.dateRange.end}`;
+
+                renderRecords(payload);
+            } catch (error) {
+                console.error(error);
+                renderError("We couldn't load the Swiss personal records right now. Please try again later.");
+            }
         }
 
         loadRecords();

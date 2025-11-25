@@ -1,55 +1,201 @@
+:root {
+    --bg: #0b0c0f;
+    --panel: #13141a;
+    --panel-strong: #1e2029;
+    --text: #f7f8fb;
+    --muted: #9ea4b5;
+    --accent: #f44336;
+    --accent-2: #4db2ff;
+    --border: #1f212a;
+    --shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    --radius: 14px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: Arial, sans-serif;
     margin: 0;
-    background: #111;
-    color: #eee;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+a {
+    color: var(--accent-2);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.hero {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(77, 178, 255, 0.08));
+    border-bottom: 1px solid var(--border);
+    padding: 32px 24px 48px;
+}
+
+.hero__content {
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
 h1 {
+    margin: 6px 0 10px;
+    font-size: 32px;
+    letter-spacing: -0.02em;
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin: 0;
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--muted);
+}
+
+.date-window {
+    margin-top: 12px;
+    color: var(--muted);
+}
+
+.page {
+    max-width: 1000px;
+    margin: -28px auto 40px;
+    padding: 0 16px;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    min-height: 260px;
+}
+
+.status {
     text-align: center;
-    padding: 20px 0;
+    color: var(--muted);
+    padding: 18px;
 }
 
-#records {
-    max-width: 900px;
-    margin: 20px auto;
-    padding: 20px;
+.status.error {
+    color: #ff8c82;
 }
 
-.date-block {
-    background: #222;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    padding: 15px;
-}
-
-.date-block h2 {
-    border-bottom: 1px solid #444;
-    padding-bottom: 5px;
-}
-
-.record-entry {
-    padding: 8px 0;
+.records {
     display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.date-group {
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.date-group__header {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #333;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
 }
 
-.event {
-    font-weight: bold;
-    color: #4db2ff;
+.date-group__header .date {
+    font-weight: 600;
 }
 
-.name {
-    color: #fff;
+.date-group__header .count {
+    color: var(--muted);
+    font-size: 13px;
 }
 
-.pr-values {
-    color: #bbb;
+.record-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1.5fr 1fr;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
 }
 
-.loading {
-    text-align: center;
-    padding: 20px;
-    color: #4db2ff;
+.record-row:last-child {
+    border-bottom: none;
+}
+
+.record-row__event {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.record-row__event-name {
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(77, 178, 255, 0.15);
+    color: var(--accent-2);
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.record-row__competitor .name {
+    font-weight: 600;
+}
+
+.record-row__competitor .muted {
+    margin-top: 2px;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.record-row__times {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 8px;
+    text-align: right;
+}
+
+.time {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+    .record-row {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        text-align: left;
+    }
+
+    .record-row__times {
+        text-align: left;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
