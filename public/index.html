@@ -79,6 +79,12 @@
         async function loadRecords() {
             try {
                 const response = await fetch("/api/swiss-prs");
+                const payload = await response.json();
+                if (!response.ok) {
+                    const detail = payload?.details ? ` (${payload.details})` : "";
+                    throw new Error(`Unexpected response from server${detail}`);
+                }
+
                 if (!response.ok) throw new Error("Unexpected response from server");
 
                 const payload = await response.json();
