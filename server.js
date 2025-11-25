@@ -12,6 +12,11 @@ const PORT = process.env.PORT || 3000;
 const BASE_API_URL = process.env.WCA_API_URL || "https://wca-rest-api.robiningelbrecht.be";
 const DEFAULT_COUNTRY = "CH";
 const PER_PAGE = 100;
+const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+const RESULT_CACHE_TTL_MS = 2 * 60 * 1000;
+
+const pageCache = new Map();
+const resultCache = { key: null, expiresAt: 0, data: null };
 
 app.use(express.static("public"));
 
@@ -52,23 +57,88 @@ function normalizeRecord(result) {
     };
 }
 
+class GitHubUnavailableError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "GitHubUnavailableError";
+    }
+}
+
+function getPageCacheKey(page, start, end) {
+    return `${start}:${end}:${page}`;
+}
+
+function getCachedPage(cacheKey) {
+    const cached = pageCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+    }
+    pageCache.delete(cacheKey);
+    return null;
+}
+
+function setCachedPage(cacheKey, data) {
+    pageCache.set(cacheKey, { data, expiresAt: Date.now() + PAGE_CACHE_TTL_MS });
+}
+
+function getCachedResult(key) {
+    if (resultCache.key === key && resultCache.expiresAt > Date.now()) {
+        return resultCache.data;
+    }
+    resultCache.key = null;
+    resultCache.data = null;
+    resultCache.expiresAt = 0;
+    return null;
+}
+
+function setCachedResult(key, data) {
+    resultCache.key = key;
+    resultCache.data = data;
+    resultCache.expiresAt = Date.now() + RESULT_CACHE_TTL_MS;
+}
+
 async function fetchSwissPersonalRecords() {
     const { start, end } = getLastMonthRange();
+    const cacheKey = `${start}:${end}`;
+    const cachedResult = getCachedResult(cacheKey);
+    if (cachedResult) return cachedResult;
+
     let page = 1;
     const collected = [];
 
     while (true) {
-        const { data } = await axios.get(`${BASE_API_URL}/results`, {
-            params: {
-                country_iso2: DEFAULT_COUNTRY,
-                page,
-                per_page: PER_PAGE,
-                date_from: start,
-                date_to: end,
-                is_personal_record: true,
-                sort: "-date"
+        const pageCacheKey = getPageCacheKey(page, start, end);
+        let data = getCachedPage(pageCacheKey);
+
+        if (!data) {
+            try {
+                const response = await axios.get(`${BASE_API_URL}/results`, {
+                    params: {
+                        country_iso2: DEFAULT_COUNTRY,
+                        page,
+                        per_page: PER_PAGE,
+                        date_from: start,
+                        date_to: end,
+                        is_personal_record: true,
+                        sort: "-date"
+                    }
+                });
+                data = response.data;
+                setCachedPage(pageCacheKey, data);
+            } catch (error) {
+                const status = error.response?.status;
+                const isNetworkIssue = !status && error.code;
+                if (status === 404) {
+                    break;
+                }
+                if (status === 429 || status === 403 || isNetworkIssue) {
+                    throw new GitHubUnavailableError(
+                        "GitHub API is unreachable or rate limited. Please try again shortly."
+                    );
+                }
+                throw error;
             }
-        });
+        }
 
         const items = data?.results || data?.data || data || [];
         const filtered = items.filter((item) => isPersonalRecord(item));
@@ -78,7 +148,9 @@ async function fetchSwissPersonalRecords() {
         page++;
     }
 
-    return collected.filter((item) => item.date !== null);
+    const normalized = collected.filter((item) => item.date !== null);
+    setCachedResult(cacheKey, normalized);
+    return normalized;
 }
 
 app.get("/api/swiss-prs", async (req, res) => {
@@ -98,8 +170,14 @@ app.get("/api/swiss-prs", async (req, res) => {
         });
     } catch (error) {
         console.error("Failed to fetch Swiss PRs", error.message);
-        res.status(502).json({
-            error: "Unable to load Swiss personal records right now.",
+        const statusCode = error instanceof GitHubUnavailableError ? 502 : 500;
+        const message =
+            error instanceof GitHubUnavailableError
+                ? "GitHub API is temporarily unavailable or rate limited. Please try again later."
+                : "Unable to load Swiss personal records right now.";
+
+        res.status(statusCode).json({
+            error: message,
             details: error.message
         });
     }
