@@ -85,6 +85,9 @@
                     throw new Error(`Unexpected response from server${detail}`);
                 }
 
+                if (!response.ok) throw new Error("Unexpected response from server");
+
+                const payload = await response.json();
                 const dateWindow = document.getElementById("date-window");
                 dateWindow.textContent = `Window: ${payload.dateRange.start} → ${payload.dateRange.end}`;
 
