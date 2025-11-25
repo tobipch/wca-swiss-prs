@@ -10,7 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const BASE_API_URL = process.env.WCA_API_URL || "https://wca-rest-api.robiningelbrecht.be";
-const BASE_API_KEY = process.env.WCA_API_KEY || "";
 const DEFAULT_COUNTRY = "CH";
 const PER_PAGE = 100;
 
@@ -53,22 +52,13 @@ function normalizeRecord(result) {
     };
 }
 
-const apiClient = axios.create({
-    baseURL: BASE_API_URL,
-    headers: {
-        ...(BASE_API_KEY ? { "x-api-key": BASE_API_KEY } : {}),
-        "User-Agent": "wca-swiss-prs/1.0"
-    },
-    validateStatus: (status) => status >= 200 && status < 300
-});
-
 async function fetchSwissPersonalRecords() {
     const { start, end } = getLastMonthRange();
     let page = 1;
     const collected = [];
 
     while (true) {
-        const { data } = await apiClient.get(`/results`, {
+        const { data } = await axios.get(`${BASE_API_URL}/results`, {
             params: {
                 country_iso2: DEFAULT_COUNTRY,
                 page,
@@ -107,12 +97,10 @@ app.get("/api/swiss-prs", async (req, res) => {
             dates: sortedDates.map((date) => ({ date, records: grouped[date] }))
         });
     } catch (error) {
-        const status = error.response?.status;
-        const detail = error.response?.data || error.message;
-        console.error("Failed to fetch Swiss PRs", status, detail);
+        console.error("Failed to fetch Swiss PRs", error.message);
         res.status(502).json({
             error: "Unable to load Swiss personal records right now.",
-            details: status ? `Upstream error ${status}` : error.message
+            details: error.message
         });
     }
 });
