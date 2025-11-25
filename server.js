@@ -9,7 +9,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const BASE_API_URL = process.env.WCA_API_URL || "https://wca-rest-api.robiningelbrecht.be";
+const DATA_BASE_URL =
+    process.env.WCA_GITHUB_BASE_URL ||
+    "https://raw.githubusercontent.com/robiningelbrecht/wca-rest-api/master/api";
 const DEFAULT_COUNTRY = "CH";
 const PER_PAGE = 100;
 const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -27,7 +29,7 @@ function toISODate(date) {
 function getLastMonthRange() {
     const end = new Date();
     const start = new Date(end);
-    start.setMonth(start.getMonth() - 1);
+    start.setDate(start.getDate() - 30);
     return { start: toISODate(start), end: toISODate(end) };
 }
 
@@ -38,7 +40,7 @@ function isPersonalRecord(result) {
     return false;
 }
 
-function normalizeRecord(result) {
+function normalizeRecord(result, normalizedDate = null) {
     const person = result.person || result.competitor || {};
     const event = result.event || {};
     const competition = result.competition || {};
@@ -53,7 +55,8 @@ function normalizeRecord(result) {
         eventName: event.name || result.event || result.event_name || event.id || "Unknown event",
         single: bestSingle || null,
         average: bestAverage || null,
-        date: competition.start_date || competition.date || result.date || result.result_date || null
+        date:
+            normalizedDate || competition.start_date || competition.date || result.date || result.result_date || null
     };
 }
 
@@ -104,7 +107,6 @@ async function fetchSwissPersonalRecords() {
     if (cachedResult) return cachedResult;
 
     let page = 1;
-    const collected = [];
 
     while (true) {
         const pageCacheKey = getPageCacheKey(page, start, end);
@@ -144,8 +146,26 @@ async function fetchSwissPersonalRecords() {
         const filtered = items.filter((item) => isPersonalRecord(item));
         collected.push(...filtered.map(normalizeRecord));
 
-        if (!Array.isArray(items) || items.length < PER_PAGE) break;
-        page++;
+    const today = toISODate(new Date());
+    const records = [];
+
+    for (const competition of competitions) {
+        const competitionId = competition.id || competition.competition_id || competition.competitionId;
+        if (!competitionId) continue;
+
+        try {
+            const { data } = await axios.get(`${DATA_BASE_URL}/results/${competitionId}.json`);
+            const items = data?.results || data || [];
+
+            items.forEach((result) => {
+                if (result.country_iso2 !== DEFAULT_COUNTRY) return;
+                if (!isPersonalRecord(result)) return;
+                records.push(normalizeRecord({ ...result, competition }, today));
+            });
+        } catch (error) {
+            if (error.response?.status === 404) continue;
+            throw error;
+        }
     }
 
     const normalized = collected.filter((item) => item.date !== null);
